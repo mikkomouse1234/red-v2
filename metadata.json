@@ -1,0 +1,6 @@
+{
+  "name": "OmniComic - Comics & Manga Reader",
+  "description": "A modern, mobile-first comic book and manga reader featuring vertical reading, offline-ready library, reading progress tracking, and curated sources from Batcave and MangaDex.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
