@@ -22,6 +22,7 @@ export const ComicsScreen: React.FC<ComicsScreenProps> = ({
   const [comics, setComics] = useState<ComicItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [selectedPublisher, setSelectedPublisher] = useState<string>('All');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
   const [activeTab, setActiveTab] = useState<'all' | 'popular' | 'recent'>('all');
@@ -32,6 +33,7 @@ export const ComicsScreen: React.FC<ComicsScreenProps> = ({
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
+    setError(null);
 
     const sortOption = activeTab === 'all' ? undefined : activeTab;
 
@@ -49,7 +51,15 @@ export const ComicsScreen: React.FC<ComicsScreenProps> = ({
       })
       .catch((err) => {
         console.error('Failed to fetch comics:', err);
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setComics([]);
+          setError(
+            err && typeof err === 'object' && 'userMessage' in err
+              ? (err as { userMessage: string }).userMessage
+              : 'The comics source is not connected yet.'
+          );
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -64,9 +74,9 @@ export const ComicsScreen: React.FC<ComicsScreenProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-950 border border-red-800/80 text-red-300">
-              Source: batcave.biz
+              Source: authorized comics feed required
             </span>
-            <span className="text-xs text-zinc-400 font-mono">Western Comics Library</span>
+            <span className="text-xs text-zinc-400 font-mono">Live source required</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
             Comics Collection
@@ -171,6 +181,12 @@ export const ComicsScreen: React.FC<ComicsScreenProps> = ({
       {/* Comics Grid */}
       {loading ? (
         <GridSkeleton count={8} />
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center p-10 text-center rounded-2xl bg-zinc-900/40 border border-dashed border-red-900/60 my-6 gap-3">
+          <div className="w-14 h-14 rounded-2xl bg-red-950/40 border border-red-900 flex items-center justify-center text-red-400 text-xl font-black">!</div>
+          <h3 className="text-base font-bold text-zinc-200">Comics source not connected</h3>
+          <p className="text-xs text-zinc-400 max-w-md leading-relaxed">{error}</p>
+        </div>
       ) : comics.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           {comics.map((comic) => (

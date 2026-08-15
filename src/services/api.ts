@@ -9,7 +9,6 @@ import {
   MangaDexSearchResponse,
   MangaDexChapterFeedResponse,
 } from '../types';
-import { BATCAVE_COMICS, generateComicPages } from '../data/comicsData';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -38,12 +37,18 @@ async function apiFetch<T>(url: string, userMessage: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** Route MangaDex-hosted images through our same-origin proxy. */
+function proxyMangaDexImage(url: string): string {
+  if (!url) return '';
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+}
+
 /** Parse a raw MangaDex manga object into our ComicItem shape. */
 function parseMangaDexManga(m: MangaDexManga): ComicItem {
   const coverRel = m.relationships.find((r) => r.type === 'cover_art');
   const coverFile = (coverRel?.attributes as { fileName?: string } | undefined)?.fileName;
   const coverUrl = coverFile
-    ? `https://uploads.mangadex.org/covers/${m.id}/${coverFile}.512.jpg`
+    ? proxyMangaDexImage(`https://uploads.mangadex.org/covers/${m.id}/${coverFile}.512.jpg`)
     : '';
 
   const authorRel = m.relationships.find((r) => r.type === 'author');
@@ -137,58 +142,28 @@ function parseMangaDexChapter(ch: MangaDexChapter, mangaAppId: string): ChapterI
 
 export const ApiService = {
   // =========================================================================
-  // COMICS (Batcave — unchanged)
+  // COMICS
   // =========================================================================
+  // Do not fabricate a comic catalogue or reader pages. Batcave does not
+  // expose an authorized API in this project, so the UI reports the source as
+  // unavailable until the owner supplies an authorized API/feed.
 
-  async getComics(params?: {
-    query?: string;
-    publisher?: string;
-    genre?: string;
-    sort?: 'popular' | 'recent' | 'rating';
-  }): Promise<ComicItem[]> {
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    let results = [...BATCAVE_COMICS];
-
-    if (params?.query) {
-      const q = params.query.toLowerCase().trim();
-      results = results.filter(
-        (c) =>
-          c.title.toLowerCase().includes(q) ||
-          c.altTitles?.some((a) => a.toLowerCase().includes(q)) ||
-          c.author?.toLowerCase().includes(q) ||
-          c.publisher?.toLowerCase().includes(q) ||
-          c.genres.some((g) => g.toLowerCase().includes(q))
-      );
-    }
-    if (params?.publisher && params.publisher !== 'All') {
-      results = results.filter((c) =>
-        c.publisher?.toLowerCase().includes(params.publisher!.toLowerCase())
-      );
-    }
-    if (params?.genre && params.genre !== 'All') {
-      results = results.filter((c) =>
-        c.genres.some((g) => g.toLowerCase() === params.genre!.toLowerCase())
-      );
-    }
-    if (params?.sort === 'popular') {
-      results.sort((a, b) => (b.isPopular ? 1 : 0) - (a.isPopular ? 1 : 0));
-    } else if (params?.sort === 'recent') {
-      results.sort((a, b) => (b.isRecentlyAdded ? 1 : 0) - (a.isRecentlyAdded ? 1 : 0));
-    } else if (params?.sort === 'rating') {
-      results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    }
-    return results;
+  async getComics(): Promise<ComicItem[]> {
+    throw new ApiError(
+      'Batcave source adapter is not configured',
+      'The comics source is not connected yet. Add an authorized comics API/feed to enable this section.'
+    );
   },
 
-  async getComicById(id: string): Promise<ComicItem | null> {
-    return BATCAVE_COMICS.find((c) => c.id === id) || null;
+  async getComicById(_id: string): Promise<ComicItem | null> {
+    return null;
   },
 
   async getComicChapterPages(comicId: string, chapterId: string): Promise<string[]> {
-    const comic = await this.getComicById(comicId);
-    if (!comic) return generateComicPages('Comic', 1, 20);
-    const chapter = comic.chapters?.find((ch) => ch.id === chapterId);
-    return generateComicPages(comic.title, chapter?.chapterNumber ?? 1, chapter?.pageCount ?? 24);
+    throw new ApiError(
+      `Comic source is not connected for ${comicId}/${chapterId}`,
+      'The comics source is not connected yet. No placeholder pages are available.'
+    );
   },
 
   // =========================================================================
@@ -291,8 +266,8 @@ export const ApiService = {
       throw new ApiError('Invalid at-home response', 'Unable to load this chapter. Please try again.');
     }
 
-    return data.chapter.data.map(
-      (file) => `${data.baseUrl}/data/${data.chapter.hash}/${file}`
+    return data.chapter.data.map((file) =>
+      proxyMangaDexImage(`${data.baseUrl}/data/${data.chapter.hash}/${file}`)
     );
   },
 

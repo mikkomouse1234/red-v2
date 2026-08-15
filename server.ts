@@ -198,13 +198,24 @@ async function startServer() {
     const imageUrl = req.query.url as string;
     if (!imageUrl) return res.status(400).send("url parameter required");
 
-    // Only proxy MangaDex / uploads domains
-    const allowed = [MANGADEX_UPLOADS, "https://cmdxd98sb0x3yprd.mangadex.network"];
-    const isAllowed = allowed.some((prefix) => imageUrl.startsWith(prefix));
-    if (!isAllowed) return res.status(403).send("Forbidden domain");
+    // MangaDex can return different At-Home hosts over time. Validate the
+    // parsed hostname instead of hard-coding one current network hostname.
+    let parsed: URL;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      return res.status(400).send("Invalid image URL");
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    const allowedHost =
+      parsed.protocol === "https:" &&
+      (hostname === "uploads.mangadex.org" || hostname.endsWith(".mangadex.network"));
+
+    if (!allowedHost) return res.status(403).send("Forbidden domain");
 
     try {
-      const response = await fetch(imageUrl, {
+      const response = await fetch(parsed.toString(), {
         headers: {
           "User-Agent": "Mozilla/5.0",
           Referer: "https://mangadex.org/",
@@ -212,13 +223,16 @@ async function startServer() {
       });
       if (!response.ok) return res.status(response.status).send("Failed to fetch image");
 
-      res.setHeader("Content-Type", response.headers.get("content-type") || "image/jpeg");
-      res.setHeader("Cache-Control", "public, max-age=86400");
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      if (!contentType.startsWith("image/")) return res.status(415).send("Not an image");
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
       const buffer = await response.arrayBuffer();
       res.send(Buffer.from(buffer));
     } catch (err) {
       console.error("Image proxy error:", err);
-      res.status(500).send("Proxy error");
+      res.status(502).send("Proxy error");
     }
   });
 
