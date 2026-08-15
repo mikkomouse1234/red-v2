@@ -37,10 +37,10 @@ async function apiFetch<T>(url: string, userMessage: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/** Route MangaDex-hosted images through our same-origin proxy. */
-function proxyMangaDexImage(url: string): string {
-  if (!url) return '';
-  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+/** MangaDex image servers can be loaded directly by an <img>. Keeping the
+ * original URL avoids failures when MangaDex rotates At-Home hosts. */
+function mangaDexImage(url: string): string {
+  return url || '';
 }
 
 /** Parse a raw MangaDex manga object into our ComicItem shape. */
@@ -48,7 +48,7 @@ function parseMangaDexManga(m: MangaDexManga): ComicItem {
   const coverRel = m.relationships.find((r) => r.type === 'cover_art');
   const coverFile = (coverRel?.attributes as { fileName?: string } | undefined)?.fileName;
   const coverUrl = coverFile
-    ? proxyMangaDexImage(`https://uploads.mangadex.org/covers/${m.id}/${coverFile}.512.jpg`)
+    ? mangaDexImage(`https://uploads.mangadex.org/covers/${m.id}/${coverFile}.512.jpg`)
     : '';
 
   const authorRel = m.relationships.find((r) => r.type === 'author');
@@ -103,6 +103,7 @@ function parseMangaDexManga(m: MangaDexManga): ComicItem {
     genres:         genres.length > 0 ? genres : [],
     demographic:    attrs.publicationDemographic,
     contentRating:  attrs.contentRating,
+    rating: undefined,
     releaseYear:    attrs.year,
     source:         'mangadex',
     type:           'manga',
@@ -267,7 +268,7 @@ export const ApiService = {
     }
 
     return data.chapter.data.map((file) =>
-      proxyMangaDexImage(`${data.baseUrl}/data/${data.chapter.hash}/${file}`)
+      mangaDexImage(`${data.baseUrl}/data/${data.chapter.hash}/${file}`)
     );
   },
 

@@ -374,7 +374,7 @@ export const ReaderScreen: React.FC<ReaderScreenProps> = ({
                     src={pageUrl}
                     alt={`Page ${index + 1}`}
                     loading={index <= currentPageIndex + 3 ? 'eager' : 'lazy'}
-                    referrerPolicy="no-referrer"
+                    referrerPolicy="strict-origin-when-cross-origin"
                     className="w-full h-full object-contain pointer-events-none"
                   />
 

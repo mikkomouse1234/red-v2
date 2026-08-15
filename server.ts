@@ -191,6 +191,22 @@ async function startServer() {
   });
 
   // ------------------------------------------------------------------
+  // MangaDex diagnostics
+  // ------------------------------------------------------------------
+  app.get("/api/mangadex/health", async (_req, res) => {
+    try {
+      const response = await mdFetch(`${MANGADEX_BASE}/manga?limit=1&contentRating[]=safe`);
+      if (!response.ok) {
+        return res.status(response.status).json({ ok: false, status: response.status });
+      }
+      res.json({ ok: true, status: response.status });
+    } catch (err) {
+      console.error("MangaDex health check failed:", err);
+      res.status(502).json({ ok: false, error: "MangaDex is unreachable from the server." });
+    }
+  });
+
+  // ------------------------------------------------------------------
   // Image proxy (handles CORS for manga page images)
   // GET /api/proxy-image?url=<encoded-url>
   // ------------------------------------------------------------------
